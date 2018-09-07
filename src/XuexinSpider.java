@@ -5,15 +5,19 @@ import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.*;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.gson.Gson;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 
 import java.io.File;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class XuexinSpider {
     private WebClient client;
+    private String token;
 
     public XuexinSpider() {
         client = new WebClient(BrowserVersion.CHROME);
@@ -22,8 +26,11 @@ public class XuexinSpider {
     }
     public static void main(String[] args) throws Exception {
         XuexinSpider spider = new XuexinSpider();
+        //String token = spider.getPhoneToken();
+        //String phn = spider.getPhoneNum();
         String res = spider.get("110771200905001323", "王海全");
         System.out.println(res);
+        //spider.ReleasePhone();
     }
     public String get(String num, String name) throws Exception {
         HtmlPage pageVcode = getPageVcode(num, name);
@@ -69,19 +76,34 @@ public class XuexinSpider {
 
     private HtmlPage getResPage(HtmlPage page, String rndid) throws Exception {
         HtmlInput phnInput = (HtmlInput)page.getElementById("mphone");
-        //TODO 设置接收号码的手机
-        phnInput.setValueAttribute("17306424123");
+        String token = getPhoneToken();
+        while (token == null) {
+            Thread.sleep(1000);
+            token = getPhoneToken();
+        }
+        String phn = getPhoneNum();
+        while (phn == null || "".equals(phn)) {
+            Thread.sleep(1000);
+            phn = getPhoneNum();
+        }
+
+        phnInput.setValueAttribute(phn);
         HtmlInput vcodeInput = (HtmlInput)page.getElementById("vcode");
         WebRequest post = new WebRequest(new URL("https://www.chsi.com.cn/xlcx/lscx/sendvcode.do"), HttpMethod.POST);
         ArrayList<NameValuePair> list = new ArrayList<>();
-        list.add(new NameValuePair("mphone", "17306424123"));
+        list.add(new NameValuePair("mphone", phn));
         Scanner scan = new Scanner(System.in);
         list.add(new NameValuePair("rndid", rndid));
         post.setRequestParameters(list);
         client.getPage(post);
-        //TODO 接收到的验证码
-        String msg = scan.nextLine();
-        vcodeInput.setValueAttribute(msg);
+
+
+        String vcode = getVCode(phn);
+        while (vcode == null) {
+            Thread.sleep(1000);
+            vcode = getVCode(phn);
+        }
+        vcodeInput.setValueAttribute(vcode);
         HtmlInput subBtn = (HtmlInput)page.getElementById("newbutton");
         return subBtn.click();
     }
@@ -99,5 +121,73 @@ public class XuexinSpider {
         }
         Gson gson = new Gson();
         return gson.toJson(map);
+    }
+
+    private String getPhoneToken() {
+        try {
+            WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/login?uName=yyq&pWord=258369&Developer=9sx2SDqYbZSChGrAMR0oJw%3d%3d"), HttpMethod.GET);
+            HtmlPage page = client.getPage(get);
+
+            String[] res = page.asText().split("&");
+            if (res.length < 2) {
+                return null;
+            } else {
+                token = res[0];
+                return res[0];
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String getPhoneNum() {
+        try {
+            WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/getPhone?ItemId=488&token=" + token), HttpMethod.GET);
+            HtmlPage page = client.getPage(get);
+            String[] res = page.asText().split(";");
+            return res[0];
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private void ReleasePhone() {
+        try {
+            WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/ReleaseAllPhone?token=" + token), HttpMethod.GET);
+            client.getPage(get);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getVCode(String phn) {
+        try {
+            WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/getMessage?token="+token+"&ItemId=488&Phone="+phn), HttpMethod.GET);
+            HtmlPage page = client.getPage(get);
+            String msg = page.asText();
+            //"MSG&488&19809404479&【学信网】学历查询短信验证码：610526，有效期15分钟，本条信息免费。[End]NOTION&API接口已经升级更新,平台稳定,号码充足[End]"
+            String[] list = msg.split("&");
+            if (list.length < 4) {
+                return null;
+            }
+            msg = list[3];
+            StringBuilder res = new StringBuilder();
+            for (int i = 0; i < msg.length(); i++) {
+                if (res.length() == 6) {
+                    return new String(res);
+                }
+                if (Character.isDigit(msg.charAt(i))) {
+                    res.append(msg.charAt(i));
+                } else {
+                    res = new StringBuilder();
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }
