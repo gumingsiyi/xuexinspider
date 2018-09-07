@@ -5,12 +5,11 @@ import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.html.*;
 import com.gargoylesoftware.htmlunit.util.NameValuePair;
 import com.google.gson.Gson;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import fateadm.Api;
+import fateadm.Util;
 
 import java.io.File;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,16 +17,25 @@ import java.util.regex.Pattern;
 public class XuexinSpider {
     private WebClient client;
     private String token;
+    private Api api;
+    private Util.HttpResp resp;
 
     public XuexinSpider() {
         client = new WebClient(BrowserVersion.CHROME);
         client.getOptions().setJavaScriptEnabled(false);
         client.getOptions().setCssEnabled(false);
+        String app_id = "305014";
+        String app_key = "5ApuPty6FhuhWpk0tos5hzvCoqsOrWTY";
+        String pd_id = "105014";
+        String pd_key = "Xgani5VEkQdpeZd+pmp0ZS2sWjaSVmZv";
+        api = new Api();
+        api.Init(app_id, app_key, pd_id, pd_key);
     }
     public static void main(String[] args) throws Exception {
         XuexinSpider spider = new XuexinSpider();
         //String token = spider.getPhoneToken();
         //String phn = spider.getPhoneNum();
+        //String res = spider.getJsonInfo(null);
         String res = spider.get("110771200905001323", "王海全");
         System.out.println(res);
         //spider.ReleasePhone();
@@ -38,6 +46,8 @@ public class XuexinSpider {
         System.out.println(pageVcode.getUrl());
         String rndid = getRndid(url);
         while (rndid == null) {
+            System.out.println("验证码识别识别失败, 重试中...");
+            resp = api.Justice(resp.req_id);
             pageVcode = getPageVcode(num, name);
             url = pageVcode.getUrl().toString();
             rndid = getRndid(url);
@@ -56,9 +66,8 @@ public class XuexinSpider {
         nameInput.setValueAttribute(name);
         HtmlImage img = (HtmlImage)page.getElementById("captchImage");
         img.saveAs(new File("xxwyzm.jpg"));
-        Scanner scan = new Scanner(System.in);
-        //TODO 调用获取验证码
-        String yzm = scan.nextLine();
+
+        String yzm = getImgVCode();
         HtmlInput yzmInput = (HtmlInput)page.getElementById("yzm");
         yzmInput.setValueAttribute(yzm);
         HtmlInput btn = (HtmlInput)page.getElementById("xueliSubmit");
@@ -92,11 +101,9 @@ public class XuexinSpider {
         WebRequest post = new WebRequest(new URL("https://www.chsi.com.cn/xlcx/lscx/sendvcode.do"), HttpMethod.POST);
         ArrayList<NameValuePair> list = new ArrayList<>();
         list.add(new NameValuePair("mphone", phn));
-        Scanner scan = new Scanner(System.in);
         list.add(new NameValuePair("rndid", rndid));
         post.setRequestParameters(list);
         client.getPage(post);
-
 
         String vcode = getVCode(phn);
         while (vcode == null) {
@@ -111,6 +118,10 @@ public class XuexinSpider {
     private String getJsonInfo(HtmlPage page) throws Exception {
         //HtmlPage page = client.getPage("https://www.chsi.com.cn/xlcx/lscx/mobileval.do?rndid=jsad12s83mbnaosccnplh8vb9h4fzw5j&state=CHSI");
         List<DomElement> list = page.getElementsByTagName("tr");
+        if (list.size() < 8) {
+            System.out.println("短信验证码获取错误，请重试...");
+            return null;
+        }
         Map<String, String> map = new HashMap<>();
         for (int i = 1; i < 8; i++) {
             DomElement element = list.get(i);
@@ -153,15 +164,6 @@ public class XuexinSpider {
         }
     }
 
-    private void ReleasePhone() {
-        try {
-            WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/ReleaseAllPhone?token=" + token), HttpMethod.GET);
-            client.getPage(get);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     private String getVCode(String phn) {
         try {
             WebRequest get = new WebRequest(new URL("http://kapi.yika66.com:20153/User/getMessage?token="+token+"&ItemId=488&Phone="+phn), HttpMethod.GET);
@@ -189,5 +191,13 @@ public class XuexinSpider {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private String getImgVCode() throws Exception {
+        String pred_type = "80300";
+        String img_file = "./xxwyzm.jpg";
+        resp = api.PredictFromFile(pred_type, img_file);
+        System.out.println("Image code is " + resp.pred_resl);
+        return resp.pred_resl;
     }
 }
