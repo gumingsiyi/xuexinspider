@@ -37,6 +37,9 @@ public class XuexinSpider {
         //String phn = spider.getPhoneNum();
         //String res = spider.getJsonInfo(null);
         String res = spider.get("110771200905001323", "王海全");
+        //String res = spider.get("126611201005000148", "黄攀");
+        //String res = spider.get("132491201605000515", "陈丽");
+
         System.out.println(res);
         //spider.ReleasePhone();
     }
@@ -87,11 +90,13 @@ public class XuexinSpider {
         HtmlInput phnInput = (HtmlInput)page.getElementById("mphone");
         String token = getPhoneToken();
         while (token == null) {
+            System.out.println("手机验证码token获取识别，重试中...");
             Thread.sleep(1000);
             token = getPhoneToken();
         }
         String phn = getPhoneNum();
         while (phn == null || "".equals(phn)) {
+            System.out.println("手机号码申请失败，重试中...");
             Thread.sleep(1000);
             phn = getPhoneNum();
         }
@@ -119,7 +124,7 @@ public class XuexinSpider {
         //HtmlPage page = client.getPage("https://www.chsi.com.cn/xlcx/lscx/mobileval.do?rndid=jsad12s83mbnaosccnplh8vb9h4fzw5j&state=CHSI");
         List<DomElement> list = page.getElementsByTagName("tr");
         if (list.size() < 8) {
-            System.out.println("短信验证码获取错误，请重试...");
+            System.out.println("短信验证码获取错误，或者查无此人，请重试...");
             return null;
         }
         Map<String, String> map = new HashMap<>();
